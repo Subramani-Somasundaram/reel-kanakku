@@ -1,0 +1,15 @@
+.vercel
+node_modules
+.env
+.env.local
+dist
+build
+.netlify
+.DS_Store
+node_modules
+.env
+.env.local
+dist
+build
+.netlify
+.DS_Store
