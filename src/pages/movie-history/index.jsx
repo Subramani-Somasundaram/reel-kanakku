@@ -141,9 +141,8 @@ const MovieHistory = () => {
     result?.sort((a, b) => {
       const parseDate = (d) => {
         if (!d) return new Date(0);
-        const [m, day, y] = d?.split('/');
-        return new Date(`${y}-${m}-${day}`);
-      };
+        return new Date(d + 'T00:00:00'); };
+        
       switch (filters?.sort) {
         case 'date_asc': return parseDate(a?.date) - parseDate(b?.date);
         case 'date_desc': return parseDate(b?.date) - parseDate(a?.date);
