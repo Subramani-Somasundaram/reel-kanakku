@@ -56,7 +56,7 @@ const StreakWidget = ({ movies }) => {
       weekStreak = 1;
       let checkDate = new Date(now);
       checkDate?.setDate(checkDate?.getDate() - 7);
-      for (let i = 0; i < 52; i++) {
+      for (let i = 0; i < 1000; i++) {
         const key = getWeekKey(checkDate?.toISOString()?.split('T')?.[0]);
         if (weekMap?.[key] > 0) {
           weekStreak++;
@@ -71,7 +71,7 @@ const StreakWidget = ({ movies }) => {
       monthStreak = 1;
       let checkYear = now?.getFullYear();
       let checkMonth = now?.getMonth() - 1;
-      for (let i = 0; i < 24; i++) {
+      for (let i = 0; i < 600; i++) {
         if (checkMonth < 0) { checkMonth = 11; checkYear--; }
         const key = `${checkYear}-${String(checkMonth + 1)?.padStart(2, '0')}`;
         if (monthMap?.[key] > 0) {
