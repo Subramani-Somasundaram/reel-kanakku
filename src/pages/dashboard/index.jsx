@@ -27,7 +27,7 @@ const Dashboard = () => {
     if (!user) return;
     const fetchMovies = async () => {
       setLoading(true);
-      const { data } = await supabase?.from('movie_entries')?.select('*')?.eq('user_id', user?.id)?.order('created_at', { ascending: false });
+      const { data } = await supabase?.from('movie_entries')?.select('*')?.eq('user_id', user?.id)?.order('watch_date', { ascending: false });
       if (data) {
         setMovies(data?.map((row) => ({
           id: row?.id,
@@ -157,10 +157,10 @@ const Dashboard = () => {
   ];
 
   // Spend breakdown totals
-  const ticketsTotal = useMemo(() => yearMovies?.reduce((s, m) => s + m?.ticketCost, 0), [yearMovies]);
-  const foodTotal = useMemo(() => yearMovies?.reduce((s, m) => s + m?.popcorn + m?.coke + m?.snacks + m?.nachos + m?.hotDog + m?.coffee + m?.water + m?.pressedJuice + m?.puffs + m?.vadaPaav + m?.samosaChat, 0), [yearMovies]);
-  const parkingTotal = useMemo(() => yearMovies?.reduce((s, m) => s + m?.parking, 0), [yearMovies]);
-  const feesTotal = useMemo(() => yearMovies?.reduce((s, m) => s + m?.bookingCharges + m?.tax, 0), [yearMovies]);
+  const ticketsTotal = useMemo(() => monthlyMovies?.reduce((s, m) => s + m?.ticketCost, 0), [monthlyMovies]);
+  const foodTotal = useMemo(() => monthlyMovies?.reduce((s, m) => s + m?.popcorn + m?.coke + m?.snacks + m?.nachos + m?.hotDog + m?.coffee + m?.water + m?.pressedJuice + m?.puffs + m?.vadaPaav + m?.samosaChat, 0), [monthlyMovies]);
+  const parkingTotal = useMemo(() => monthlyMovies?.reduce((s, m) => s + m?.parking, 0), [monthlyMovies]);
+  const feesTotal = useMemo(() => monthlyMovies?.reduce((s, m) => s + m?.bookingCharges + m?.tax, 0), [monthlyMovies]);
   const grandTotal = ticketsTotal + foodTotal + parkingTotal + feesTotal;
 
   const spendBreakdown = [
