@@ -37,6 +37,7 @@ const Dashboard = () => {
           language: row?.language,
           is3D: row?.is_3d,
           openingDay: row?.is_opening_day,
+          openingShow: row?.is_opening_show,
           tickets: row?.ticket_count,
           totalCost: parseFloat(row?.total_cost) || 0,
           screen: row?.screen_type,
@@ -150,7 +151,7 @@ const Dashboard = () => {
     },
     {
       label: "Most Visited",
-      value: theatreMap?.[0]?.name?.split(" ")?.slice(0, 2)?.join(" ") || "—",
+      value: theatreMap?.[0]?.name?.split(" ")?.slice(0,92)?.join(" ") || "—",
       icon: "Building2",
       color: "var(--color-secondary)",
     },
