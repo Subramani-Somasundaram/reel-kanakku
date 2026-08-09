@@ -455,6 +455,12 @@ const Analytics = () => {
               />
             </section>
 
+            {/* Highlights Panel */}
+            <section className="mb-6"><HighlightsPanel entries={filteredEntries} period={period} year={selectedYear} month={selectedMonth} /></section>
+
+            {/* Avg Cost Analysis */}
+            <section className="mb-6"><AvgCostAnalysis year={selectedYear} period={period} month={selectedMonth} costItems={avgCostData} /></section>
+
             {/* Spending Breakdown Chart */}
             <section className="mb-6">
               <SpendingBreakdownChart
@@ -478,16 +484,6 @@ const Analytics = () => {
                 period={period}
                 month={selectedMonth}
                 theatres={theatreData}
-              />
-            </section>
-
-            {/* Avg Cost Analysis */}
-            <section className="mb-6">
-              <AvgCostAnalysis
-                year={selectedYear}
-                period={period}
-                month={selectedMonth}
-                costItems={avgCostData}
               />
             </section>
 
@@ -517,9 +513,6 @@ const Analytics = () => {
                 companions={companionsData}
               />
             </section>
-
-            {/* Highlights Panel */}
-            <section className="mb-6"><HighlightsPanel entries={filteredEntries} period={period} year={selectedYear} month={selectedMonth} /></section>
 
             {/* Streaks Panel */}
             <section className="mb-6">
