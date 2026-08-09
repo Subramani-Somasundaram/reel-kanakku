@@ -50,8 +50,8 @@ const EntryDetailPanel = ({ entry, onClose }) => {
         </div>
         <div className="flex flex-wrap gap-1.5">
           {entry?.is3D && <Badge color="primary">3D</Badge>}
-          {entry?.openingDay && <Badge color="accent">Opening Day</Badge>}
-          {entry?.openingShow && <Badge color="success">Opening Show</Badge>}
+          {entry?.openingDay && entry?.openingShow && <Badge color="accent">FDFS</Badge>}
+          {entry?.openingDay && !entry?.openingShow && <Badge color="success">Opening Day</Badge>}
         </div>
       </div>
       {/* Movie & Show Info */}
@@ -63,6 +63,7 @@ const EntryDetailPanel = ({ entry, onClose }) => {
           <InfoRow label="Date" value={entry?.date} icon="Calendar" />
           <InfoRow label="Show Time" value={entry?.showTime} icon="Clock" />
           <InfoRow label="Theatre" value={entry?.theatre} icon="MapPin" />
+          <InfoRow label="Location" value={[entry?.city, entry?.state, entry?.country]?.filter(Boolean)?.join(', ')} icon="Map" />
           <InfoRow label="Screen" value={entry?.screen} icon="Monitor" />
           <InfoRow label="Language" value={entry?.language ? entry?.language?.charAt(0)?.toUpperCase() + entry?.language?.slice(1) : ''} icon="Globe" />
           <InfoRow label="Seat No." value={entry?.seatNo} icon="Armchair" />
