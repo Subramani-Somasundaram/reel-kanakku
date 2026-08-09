@@ -47,6 +47,9 @@ const INITIAL_FORM = {
   costBookingCharges: '',
   costTax: '',
   costParking: '',
+  city: '',
+  state: '',
+  country: '',
 };
 
 const COST_KEYS = [
@@ -158,6 +161,9 @@ const AddMovieEntry = () => {
         costTax: entry?.tax ? String(entry?.tax) : '',
         costParking: entry?.parking ? String(entry?.parking) : '',
         posterUrl: entry?.posterUrl || '',
+        city: entry?.city || '',
+        state: entry?.state || '',
+        country: entry?.country || '',
       });
       setPosterUrl(entry?.posterUrl || '');
       setPosterFile(null);
@@ -280,6 +286,9 @@ const AddMovieEntry = () => {
       watch_date: formData?.watchDate,
       language: formData?.language,
       theatre: formData?.theatre?.trim(),
+      city: formData?.city?.trim() || null,
+      state: formData?.state?.trim() || null,
+      country: formData?.country?.trim() || null,
       screen_type: formData?.screenType || null,
       screen_number: formData?.screenNumber || null,
       companions: formData?.companions || null,
