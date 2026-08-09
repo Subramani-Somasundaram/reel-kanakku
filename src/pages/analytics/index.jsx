@@ -314,7 +314,7 @@ const computePeakPatterns = (entries) => {
     if (e?.show_time) {
       const parts = e?.show_time?.split(':');
       const hour = parseInt(parts?.[0]) || 0;
-      if (hour >= 6 && hour < 12) timeMap['Morning'] += 1;
+      if (hour >= 4 && hour < 12) timeMap['Morning'] += 1;
       else if (hour >= 12 && hour < 17) timeMap['Afternoon'] += 1;
       else if (hour >= 17 && hour < 21) timeMap['Evening'] += 1;
       else timeMap['Night'] += 1;
