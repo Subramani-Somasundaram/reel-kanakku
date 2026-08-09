@@ -14,6 +14,7 @@ import AvgCostAnalysis from './components/AvgCostAnalysis';
 import PeriodSelector from './components/PeriodSelector';
 import CompanionsPanel from './components/CompanionsPanel';
 import StreaksPanel from './components/StreaksPanel';
+import HighlightsPanel from './components/HighlightsPanel';
 import { supabase } from 'lib/supabase';
 import { useAuth } from 'contexts/AuthContext';
 
@@ -516,6 +517,9 @@ const Analytics = () => {
                 companions={companionsData}
               />
             </section>
+
+            {/* Highlights Panel */}
+            <section className="mb-6"><HighlightsPanel entries={filteredEntries} period={period} year={selectedYear} month={selectedMonth} /></section>
 
             {/* Streaks Panel */}
             <section className="mb-6">
