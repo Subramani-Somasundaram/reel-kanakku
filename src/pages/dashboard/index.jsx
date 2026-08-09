@@ -219,7 +219,7 @@ const Dashboard = () => {
         ) : (
           <>
             {/* Summary Widgets */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 lg:gap-5 mb-5 md:mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 lg:gap-5 mb-5 md:mb-6">
               <SummaryWidget
                 title="Movies This Year"
                 value={yearMovies?.length}
@@ -246,15 +246,6 @@ const Dashboard = () => {
                 trend={undefined}
                 trendValue={undefined}
                 accentColor="var(--color-accent)"
-              />
-              <SummaryWidget
-                title="Monthly Spend"
-                value={formatCurrencyShort(monthlySpend)}
-                subtitle={`${MONTH_NAMES_SHORT?.[currentMonth]} ${currentYear}`}
-                icon="Wallet"
-                accentColor="var(--color-warning)"
-                trend={undefined}
-                trendValue={undefined}
               />
             </div>
 
@@ -379,53 +370,7 @@ const Dashboard = () => {
                 <QuickStats stats={quickStats} />
                 <TopTheatres theatres={theatreMap} />
 
-                {/* Cost Breakdown Card */}
-                <div
-                  className="rounded-xl p-4 md:p-5"
-                  style={{
-                    background: "var(--color-card)",
-                    border: "1px solid var(--color-border)",
-                    boxShadow: "var(--shadow-md)",
-                  }}
-                >
-                  <div className="flex items-center gap-2 mb-4">
-                    <Icon name="PieChart" size={18} color="var(--color-primary)" strokeWidth={1.8} />
-                    <h3
-                      className="text-base font-semibold"
-                      style={{ fontFamily: "var(--font-heading)", color: "var(--color-text-primary)" }}
-                    >
-                      Spend Breakdown
-                    </h3>
-                  </div>
-                  {spendBreakdown?.map((item, i) => (
-                    <div key={i} className="mb-3 last:mb-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span
-                          className="text-xs"
-                          style={{ fontFamily: "var(--font-caption)", color: "var(--color-text-secondary)" }}
-                        >
-                          {item?.label}
-                        </span>
-                        <span
-                          className="text-xs font-semibold"
-                          style={{ fontFamily: "var(--font-data)", color: "var(--color-text-primary)" }}
-                        >
-                          {formatCurrencyShort(item?.amount)}
-                        </span>
-                      </div>
-                      <div
-                        className="w-full h-1.5 rounded-full overflow-hidden"
-                        style={{ background: "var(--color-surface-2)" }}
-                      >
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${item?.pct}%`, background: item?.color }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
+                
                 {/* Navigate to Analytics */}
                 <button
                   className="w-full rounded-xl p-4 flex items-center justify-between gap-3 transition-all duration-250 group"
