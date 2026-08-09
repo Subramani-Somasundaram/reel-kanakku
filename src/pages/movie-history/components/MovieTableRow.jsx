@@ -37,11 +37,11 @@ const MovieTableRow = ({ entry, isSelected, isExpanded, onSelect, onToggleExpand
                 {entry?.is3D && (
                   <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(212,175,55,0.15)', color: 'var(--color-primary)', fontFamily: 'var(--font-caption)' }}>3D</span>
                 )}
-                {entry?.openingDay && (
-                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,107,107,0.15)', color: 'var(--color-accent)', fontFamily: 'var(--font-caption)' }}>Opening Day</span>
+                {entry?.openingDay && entry?.openingShow && (
+                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,107,107,0.15)', color: 'var(--color-accent)', fontFamily: 'var(--font-caption)' }}>FDFS</span>
                 )}
-                {entry?.openingShow && (
-                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--color-success)', fontFamily: 'var(--font-caption)' }}>Opening Show</span>
+                {entry?.openingDay && !entry?.openingShow && (
+                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--color-success)', fontFamily: 'var(--font-caption)' }}>Opening Day</span>
                 )}
               </div>
             </div>
