@@ -2,388 +2,371 @@ import React, { useMemo } from "react";
 import Icon from "components/AppIcon";
 
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAY_MS = 86400000;
 
-const getWeekNumber = (date) => {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d?.getUTCDay() || 7;
-  d?.setUTCDate(d?.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+// ── date helpers (all UTC so no timezone drift) ─────────────────────────────
+const parseUTC = (s) => new Date(`${s}T00:00:00Z`);
+
+// Monday-start week beginning, as UTC ms
+const weekStartMs = (s) => {
+  const d = parseUTC(s);
+  const dow = (d?.getUTCDay() + 6) % 7; // Mon = 0
+  return d?.getTime() - dow * DAY_MS;
 };
 
-const getWeekKey = (dateStr) => {
-  const d = new Date(dateStr);
-  return `${d?.getFullYear()}-W${String(getWeekNumber(d))?.padStart(2, '0')}`;
+// months since year 0, so consecutive months differ by 1
+const monthIndex = (s) => {
+  const [y, m] = String(s)?.split('-')?.map(Number);
+  return y * 12 + (m - 1);
 };
 
-const getMonthKey = (dateStr) => {
-  const d = new Date(dateStr);
-  return `${d?.getFullYear()}-${String(d?.getMonth() + 1)?.padStart(2, '0')}`;
+const fmtDay = (ms) => {
+  const d = new Date(ms);
+  return `${d?.getUTCDate()} ${MONTH_NAMES?.[d?.getUTCMonth()]} ${d?.getUTCFullYear()}`;
 };
+const fmtDayShort = (ms) => {
+  const d = new Date(ms);
+  return `${d?.getUTCDate()} ${MONTH_NAMES?.[d?.getUTCMonth()]}`;
+};
+const fmtMonth = (idx) => `${MONTH_NAMES?.[idx % 12]} ${Math.floor(idx / 12)}`;
 
 const computeStreaks = (entries) => {
-  if (!entries?.length) return null;
+  const dates = (entries || [])
+    ?.map((e) => e?.watch_date)
+    ?.filter(Boolean)
+    ?.sort();
+  if (dates?.length === 0) return null;
 
   const now = new Date();
+  const todayISO = now?.toISOString()?.split('T')?.[0];
 
-  // Build week and month maps
-  const weekMap = {};
-  const monthMap = {};
-
-  entries?.forEach((e) => {
-    if (!e?.watch_date) return;
-    const wk = getWeekKey(e?.watch_date);
-    const mo = getMonthKey(e?.watch_date);
-    weekMap[wk] = (weekMap?.[wk] || 0) + 1;
-    monthMap[mo] = (monthMap?.[mo] || 0) + 1;
+  // ── weeks ────────────────────────────────────────────────────────────────
+  const weekCount = {};
+  dates?.forEach((d) => {
+    const w = weekStartMs(d);
+    weekCount[w] = (weekCount?.[w] || 0) + 1;
   });
+  const weeks = Object.keys(weekCount)?.map(Number)?.sort((a, b) => a - b);
 
-  const currentWeekKey = getWeekKey(now?.toISOString()?.split('T')?.[0]);
-  const currentMonthKey = getMonthKey(now?.toISOString()?.split('T')?.[0]);
+  // ── months ───────────────────────────────────────────────────────────────
+  const monthCount = {};
+  dates?.forEach((d) => {
+    const m = monthIndex(d);
+    monthCount[m] = (monthCount?.[m] || 0) + 1;
+  });
+  const months = Object.keys(monthCount)?.map(Number)?.sort((a, b) => a - b);
 
-  // ── Current weekly streak ──────────────────────────────────────────────────
-  let currentWeekStreak = 0;
-  if (weekMap?.[currentWeekKey] > 0) {
-    currentWeekStreak = 1;
-    let checkDate = new Date(now);
-    checkDate?.setDate(checkDate?.getDate() - 7);
-    for (let i = 0; i < 1000; i++) {
-      const key = getWeekKey(checkDate?.toISOString()?.split('T')?.[0]);
-      if (weekMap?.[key] > 0) { currentWeekStreak++; checkDate?.setDate(checkDate?.getDate() - 7); }
-      else break;
-    }
-  }
-
-  // ── Longest weekly streak ──────────────────────────────────────────────────
-  const sortedWeeks = Object.keys(weekMap)?.sort();
-  let longestWeekStreak = 0;
-  let tempWeekStreak = 0;
-  let prevWeekDate = null;
-  sortedWeeks?.forEach((wk) => {
-    const [yr, wNum] = wk?.split('-W')?.map(Number);
-    if (prevWeekDate) {
-      const prevWk = getWeekKey(prevWeekDate?.toISOString()?.split('T')?.[0]);
-      const [pyr, pwNum] = prevWk?.split('-W')?.map(Number);
-      const isConsecutive = (yr === pyr && wNum === pwNum + 1) || (yr === pyr + 1 && pwNum >= 52 && wNum === 1);
-      if (isConsecutive) tempWeekStreak++;
-      else tempWeekStreak = 1;
+  // ── longest weekly run ───────────────────────────────────────────────────
+  let bestW = { len: 0, from: null, to: null };
+  let runStart = weeks?.[0];
+  let runLen = 1;
+  for (let i = 1; i <= weeks?.length; i++) {
+    const consecutive = i < weeks?.length && weeks?.[i] - weeks?.[i - 1] === 7 * DAY_MS;
+    if (consecutive) {
+      runLen += 1;
     } else {
-      tempWeekStreak = 1;
-    }
-    longestWeekStreak = Math.max(longestWeekStreak, tempWeekStreak);
-    // Advance prevWeekDate by 7 days from a date in that week
-    const jan4 = new Date(Date.UTC(yr, 0, 4));
-    const weekStart = new Date(jan4.getTime() + (wNum - 1) * 7 * 86400000);
-    prevWeekDate = weekStart;
-  });
-
-  // ── Current monthly streak ─────────────────────────────────────────────────
-  let currentMonthStreak = 0;
-  if (monthMap?.[currentMonthKey] > 0) {
-    currentMonthStreak = 1;
-    let checkYear = now?.getFullYear();
-    let checkMonth = now?.getMonth() - 1;
-    for (let i = 0; i < 600; i++) {
-      if (checkMonth < 0) { checkMonth = 11; checkYear--; }
-      const key = `${checkYear}-${String(checkMonth + 1)?.padStart(2, '0')}`;
-      if (monthMap?.[key] > 0) { currentMonthStreak++; checkMonth--; }
-      else break;
+      if (runLen > bestW?.len) {
+        bestW = { len: runLen, from: runStart, to: weeks?.[i - 1] + 6 * DAY_MS };
+      }
+      runStart = weeks?.[i];
+      runLen = 1;
     }
   }
 
-  // ── Longest monthly streak ─────────────────────────────────────────────────
-  const sortedMonths = Object.keys(monthMap)?.sort();
-  let longestMonthStreak = 0;
-  let tempMonthStreak = 0;
-  let prevMonthKey = null;
-  sortedMonths?.forEach((mo) => {
-    const [yr, mn] = mo?.split('-')?.map(Number);
-    if (prevMonthKey) {
-      const [pyr, pmn] = prevMonthKey?.split('-')?.map(Number);
-      const isConsecutive = (yr === pyr && mn === pmn + 1) || (yr === pyr + 1 && pmn === 12 && mn === 1);
-      if (isConsecutive) tempMonthStreak++;
-      else tempMonthStreak = 1;
+  // ── longest monthly run ──────────────────────────────────────────────────
+  let bestM = { len: 0, from: null, to: null };
+  let mStart = months?.[0];
+  let mLen = 1;
+  for (let i = 1; i <= months?.length; i++) {
+    const consecutive = i < months?.length && months?.[i] - months?.[i - 1] === 1;
+    if (consecutive) {
+      mLen += 1;
     } else {
-      tempMonthStreak = 1;
+      if (mLen > bestM?.len) {
+        bestM = { len: mLen, from: mStart, to: months?.[i - 1] };
+      }
+      mStart = months?.[i];
+      mLen = 1;
     }
-    longestMonthStreak = Math.max(longestMonthStreak, tempMonthStreak);
-    prevMonthKey = mo;
-  });
-
-  // ── Most active week ───────────────────────────────────────────────────────
-  let mostActiveWeekKey = null;
-  let mostActiveWeekCount = 0;
-  Object.entries(weekMap)?.forEach(([k, v]) => {
-    if (v > mostActiveWeekCount) { mostActiveWeekCount = v; mostActiveWeekKey = k; }
-  });
-  let mostActiveWeekLabel = '—';
-  if (mostActiveWeekKey) {
-    const [yr, wNum] = mostActiveWeekKey?.split('-W')?.map(Number);
-    mostActiveWeekLabel = `Week ${wNum}, ${yr}`;
   }
 
-  // ── Most active month ──────────────────────────────────────────────────────
-  let mostActiveMonthKey = null;
-  let mostActiveMonthCount = 0;
-  Object.entries(monthMap)?.forEach(([k, v]) => {
-    if (v > mostActiveMonthCount) { mostActiveMonthCount = v; mostActiveMonthKey = k; }
-  });
-  let mostActiveMonthLabel = '—';
-  if (mostActiveMonthKey) {
-    const [yr, mn] = mostActiveMonthKey?.split('-')?.map(Number);
-    mostActiveMonthLabel = `${MONTH_NAMES?.[mn - 1]} ${yr}`;
+  // ── current runs (walk back from today) ──────────────────────────────────
+  const thisWeek = weekStartMs(todayISO);
+  let curW = 0;
+  let curWFrom = null;
+  if (weekCount?.[thisWeek]) {
+    let cursor = thisWeek;
+    while (weekCount?.[cursor]) { curW += 1; curWFrom = cursor; cursor -= 7 * DAY_MS; }
   }
 
-  // ── Average movies per week (active weeks only) ────────────────────────────
-  const totalWeeks = Object.keys(weekMap)?.length;
-  const avgPerWeek = totalWeeks > 0 ? (entries?.length / totalWeeks)?.toFixed(1) : '0';
-
-  // ── Average movies per month (active months only) ─────────────────────────
-  const totalMonths = Object.keys(monthMap)?.length;
-  const avgPerMonth = totalMonths > 0 ? (entries?.length / totalMonths)?.toFixed(1) : '0';
-
-  // ── Total active weeks / months ────────────────────────────────────────────
-  const activeWeeks = totalWeeks;
-  const activeMonths = totalMonths;
-
-  // ── Current week / month movies ────────────────────────────────────────────
-  const thisWeekMovies = weekMap?.[currentWeekKey] || 0;
-  const thisMonthMovies = monthMap?.[currentMonthKey] || 0;
-
-  // ── Best streak ever (week or month) ──────────────────────────────────────
-  const overallBest = Math.max(longestWeekStreak, longestMonthStreak);
-
-  // ── Last 8 weeks for mini bar chart ───────────────────────────────────────
-  const last8Weeks = [];
-  for (let i = 7; i >= 0; i--) {
-    const d = new Date(now);
-    d?.setDate(d?.getDate() - i * 7);
-    const key = getWeekKey(d?.toISOString()?.split('T')?.[0]);
-    const [, wNum] = key?.split('-W')?.map(Number);
-    last8Weeks?.push({ label: `W${wNum}`, count: weekMap?.[key] || 0, key });
+  const thisMonth = monthIndex(todayISO);
+  let curM = 0;
+  let curMFrom = null;
+  if (monthCount?.[thisMonth]) {
+    let cursor = thisMonth;
+    while (monthCount?.[cursor]) { curM += 1; curMFrom = cursor; cursor -= 1; }
   }
 
-  // ── Last 6 months for mini bar chart ──────────────────────────────────────
-  const last6Months = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = getMonthKey(d?.toISOString()?.split('T')?.[0]);
-    last6Months?.push({ label: MONTH_NAMES?.[d?.getMonth()], count: monthMap?.[key] || 0, key });
+  // ── busiest week / month ─────────────────────────────────────────────────
+  let topW = { count: 0, start: null };
+  weeks?.forEach((w) => { if (weekCount?.[w] > topW?.count) topW = { count: weekCount?.[w], start: w }; });
+  let topM = { count: 0, idx: null };
+  months?.forEach((m) => { if (monthCount?.[m] > topM?.count) topM = { count: monthCount?.[m], idx: m }; });
+
+  // ── longest gap between two films ────────────────────────────────────────
+  let gap = { days: 0, from: null, to: null };
+  for (let i = 1; i < dates?.length; i++) {
+    const a = parseUTC(dates?.[i - 1])?.getTime();
+    const b = parseUTC(dates?.[i])?.getTime();
+    const days = Math.round((b - a) / DAY_MS);
+    if (days > gap?.days) gap = { days, from: a, to: b };
   }
+
+  const total = dates?.length;
 
   return {
-    currentWeekStreak,
-    longestWeekStreak,
-    currentMonthStreak,
-    longestMonthStreak,
-    mostActiveWeekLabel,
-    mostActiveWeekCount,
-    mostActiveMonthLabel,
-    mostActiveMonthCount,
-    avgPerWeek,
-    avgPerMonth,
-    activeWeeks,
-    activeMonths,
-    thisWeekMovies,
-    thisMonthMovies,
-    last8Weeks,
-    last6Months,
-    overallBest,
-    totalMovies: entries?.length,
+    total,
+    firstDate: parseUTC(dates?.[0])?.getTime(),
+    lastDate: parseUTC(dates?.[dates?.length - 1])?.getTime(),
+    currentWeek: curW,
+    currentWeekFrom: curWFrom,
+    currentMonth: curM,
+    currentMonthFrom: curMFrom,
+    thisWeekCount: weekCount?.[thisWeek] || 0,
+    thisMonthCount: monthCount?.[thisMonth] || 0,
+    longestWeek: bestW,
+    longestMonth: bestM,
+    topWeek: topW,
+    topMonth: topM,
+    activeWeeks: weeks?.length,
+    activeMonths: months?.length,
+    avgPerWeek: weeks?.length ? total / weeks?.length : 0,
+    avgPerMonth: months?.length ? total / months?.length : 0,
+    gap,
+    weekCount,
+    monthCount,
+    thisWeekStart: thisWeek,
+    thisMonthIdx: thisMonth,
   };
 };
 
-const StatCard = ({ icon, iconColor, label, value, sub, bg, border }) => (
-  <div
-    className="rounded-lg p-3 flex flex-col gap-1"
-    style={{ background: bg || "var(--color-surface-2)", border: `1px solid ${border || "var(--color-border)"}` }}
-  >
-    <div className="flex items-center justify-between">
-      <span className="text-xs" style={{ fontFamily: "var(--font-caption)", color: "var(--color-text-secondary)" }}>{label}</span>
-      <Icon name={icon} size={13} color={iconColor || "var(--color-primary)"} />
-    </div>
-    <span className="text-xl font-bold leading-tight" style={{ fontFamily: "var(--font-data)", color: iconColor || "var(--color-primary)" }}>
-      {value}
-    </span>
-    {sub && <span className="text-xs" style={{ fontFamily: "var(--font-caption)", color: "var(--color-text-secondary)" }}>{sub}</span>}
-  </div>
-);
-
-const MiniBarChart = ({ data, maxVal, color }) => {
-  const max = maxVal || Math.max(...data?.map((d) => d?.count), 1);
+const MiniBars = ({ data, color }) => {
+  const max = Math.max(...data?.map((d) => d?.count), 1);
   return (
-    <div className="flex items-end gap-1 h-12">
+    <div className="flex items-end gap-1.5 h-12">
       {data?.map((d, i) => (
-        <div key={i} className="flex flex-col items-center gap-0.5 flex-1">
-          <div className="w-full rounded-sm" style={{ height: `${Math.max((d?.count / max) * 40, d?.count > 0 ? 4 : 2)}px`, background: d?.count > 0 ? color : "var(--color-surface-2)", transition: "height 0.3s ease" }} />
-          <span className="text-xs" style={{ fontFamily: "var(--font-caption)", color: "var(--color-text-secondary)", fontSize: "9px" }}>{d?.label}</span>
+        <div key={i} className="flex-1 flex flex-col items-center gap-1">
+          <div
+            className="w-full rounded-sm"
+            style={{
+              height: `${Math.max((d?.count / max) * 36, d?.count > 0 ? 4 : 2)}px`,
+              background: d?.count > 0 ? color : 'var(--color-surface-3)',
+              opacity: d?.count > 0 ? 1 : 0.4,
+            }}
+            title={`${d?.label}: ${d?.count}`}
+          />
+          <span className="text-[9px]" style={{ fontFamily: 'var(--font-caption)', color: 'var(--color-text-secondary)' }}>
+            {d?.label}
+          </span>
         </div>
       ))}
     </div>
   );
 };
 
-const StreaksPanel = ({ entries }) => {
-  const data = useMemo(() => computeStreaks(entries), [entries]);
+const Stat = ({ icon, iconColor, label, value, unit, sub, valueColor }) => (
+  <div
+    className="rounded-lg p-3.5"
+    style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}
+  >
+    <div className="flex items-center justify-between mb-1.5">
+      <span className="text-xs" style={{ fontFamily: 'var(--font-caption)', color: 'var(--color-text-secondary)' }}>
+        {label}
+      </span>
+      <Icon name={icon} size={14} color={iconColor} strokeWidth={1.8} />
+    </div>
+    <p className="text-xl font-bold leading-tight" style={{ fontFamily: 'var(--font-data)', color: valueColor }}>
+      {value}
+      {unit && <span className="text-xs ml-1" style={{ color: 'var(--color-text-secondary)' }}>{unit}</span>}
+    </p>
+    {sub && (
+      <p className="text-xs mt-1" style={{ fontFamily: 'var(--font-caption)', color: 'var(--color-text-secondary)' }}>
+        {sub}
+      </p>
+    )}
+  </div>
+);
 
-  if (!data) {
+const StreaksPanel = ({ entries = [] }) => {
+  const s = useMemo(() => computeStreaks(entries), [entries]);
+
+  if (!s) {
     return (
-      <div
-        className="rounded-xl p-6 flex flex-col items-center justify-center gap-3"
-        style={{ background: "var(--color-card)", border: "1px solid var(--color-border)", boxShadow: "var(--shadow-md)", minHeight: "200px" }}
-      >
-        <Icon name="Flame" size={32} color="var(--color-text-secondary)" strokeWidth={1.5} />
-        <p className="text-sm text-center" style={{ fontFamily: "var(--font-caption)", color: "var(--color-text-secondary)" }}>
-          No streak data yet. Start watching movies to build your streaks!
+      <div className="rounded-xl p-4 md:p-5" style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-md)' }}>
+        <div className="flex items-center gap-2 mb-3">
+          <Icon name="Flame" size={18} color="var(--color-primary)" strokeWidth={1.8} />
+          <h3 className="text-base font-semibold" style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-text-primary)' }}>
+            Streak Tracker
+          </h3>
+        </div>
+        <p className="text-sm py-6 text-center" style={{ fontFamily: 'var(--font-caption)', color: 'var(--color-text-secondary)' }}>
+          No entries yet.
         </p>
       </div>
     );
   }
 
+  // last 8 weeks / last 6 months for the mini charts
+  const lastWeeks = Array.from({ length: 8 }, (_, i) => {
+    const start = s?.thisWeekStart - (7 - i) * 7 * DAY_MS;
+    return { label: fmtDayShort(start), count: s?.weekCount?.[start] || 0 };
+  });
+  const lastMonths = Array.from({ length: 6 }, (_, i) => {
+    const idx = s?.thisMonthIdx - (5 - i);
+    return { label: MONTH_NAMES?.[idx % 12], count: s?.monthCount?.[idx] || 0 };
+  });
+
+  const gapMonths = Math.round((s?.gap?.days / 30.44) * 10) / 10;
+
   return (
-    <div
-      className="rounded-xl p-4 md:p-5"
-      style={{ background: "var(--color-card)", border: "1px solid var(--color-border)", boxShadow: "var(--shadow-md)" }}
-    >
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-5">
+    <div className="rounded-xl p-4 md:p-5" style={{ background: 'var(--color-card)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-md)' }}>
+      <div className="flex items-center gap-2 mb-4">
         <Icon name="Flame" size={18} color="var(--color-primary)" strokeWidth={1.8} />
-        <h3 className="text-base font-semibold" style={{ fontFamily: "var(--font-heading)", color: "var(--color-text-primary)" }}>
+        <h3 className="text-base font-semibold" style={{ fontFamily: 'var(--font-heading)', color: 'var(--color-text-primary)' }}>
           Streak Tracker
         </h3>
-        <span className="ml-auto text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(212,175,55,0.12)", color: "var(--color-primary)", fontFamily: "var(--font-caption)", border: "1px solid rgba(212,175,55,0.25)" }}>
-          {data?.totalMovies} total movies
+        <span className="ml-auto text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--color-primary)', fontFamily: 'var(--font-caption)' }}>
+          {s?.total} total movies
         </span>
       </div>
-      {/* Current Streaks — hero row */}
-      <div className="grid grid-cols-2 gap-3 mb-5">
-        <div
-          className="rounded-xl p-4 flex flex-col gap-2"
-          style={{ background: "linear-gradient(135deg, rgba(212,175,55,0.12), rgba(212,175,55,0.04))", border: "1px solid rgba(212,175,55,0.3)" }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wide" style={{ fontFamily: "var(--font-caption)", color: "var(--color-primary)" }}>Current Weekly</span>
-            <Icon name="CalendarDays" size={14} color="var(--color-primary)" />
+
+      {/* current streaks */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+        <div className="rounded-lg p-4" style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.10), rgba(212,175,55,0.02))', border: '1px solid rgba(212,175,55,0.25)' }}>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold tracking-wide" style={{ fontFamily: 'var(--font-caption)', color: 'var(--color-primary)' }}>CURRENT WEEKLY</span>
+            <Icon name="CalendarCheck" size={15} color="var(--color-primary)" strokeWidth={1.8} />
           </div>
-          <div className="flex items-end gap-1.5">
-            <span className="text-4xl font-bold leading-none" style={{ fontFamily: "var(--font-data)", color: "var(--color-primary)" }}>{data?.currentWeekStreak}</span>
-            <span className="text-sm mb-1" style={{ fontFamily: "var(--font-caption)", color: "var(--color-text-secondary)" }}>weeks</span>
-          </div>
-          <span className="text-xs" style={{ fontFamily: "var(--font-caption)", color: "var(--color-text-secondary)" }}>
-            {data?.thisWeekMovies} movie{data?.thisWeekMovies !== 1 ? "s" : ""} this week
-          </span>
+          <p className="text-2xl font-bold" style={{ fontFamily: 'var(--font-data)', color: 'var(--color-primary)' }}>
+            {s?.currentWeek}<span className="text-sm ml-1.5" style={{ color: 'var(--color-text-secondary)' }}>weeks</span>
+          </p>
+          <p className="text-xs mt-1" style={{ fontFamily: 'var(--font-caption)', color: 'var(--color-text-secondary)' }}>
+            {s?.currentWeek > 0
+              ? `Since ${fmtDay(s?.currentWeekFrom)} · ${s?.thisWeekCount} this week`
+              : 'Nothing watched this week'}
+          </p>
         </div>
 
-        <div
-          className="rounded-xl p-4 flex flex-col gap-2"
-          style={{ background: "linear-gradient(135deg, rgba(78,205,196,0.12), rgba(78,205,196,0.04))", border: "1px solid rgba(78,205,196,0.3)" }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wide" style={{ fontFamily: "var(--font-caption)", color: "var(--color-success)" }}>Current Monthly</span>
-            <Icon name="Calendar" size={14} color="var(--color-success)" />
+        <div className="rounded-lg p-4" style={{ background: 'linear-gradient(135deg, rgba(78,205,196,0.10), rgba(78,205,196,0.02))', border: '1px solid rgba(78,205,196,0.25)' }}>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold tracking-wide" style={{ fontFamily: 'var(--font-caption)', color: 'var(--color-success)' }}>CURRENT MONTHLY</span>
+            <Icon name="CalendarRange" size={15} color="var(--color-success)" strokeWidth={1.8} />
           </div>
-          <div className="flex items-end gap-1.5">
-            <span className="text-4xl font-bold leading-none" style={{ fontFamily: "var(--font-data)", color: "var(--color-success)" }}>{data?.currentMonthStreak}</span>
-            <span className="text-sm mb-1" style={{ fontFamily: "var(--font-caption)", color: "var(--color-text-secondary)" }}>months</span>
-          </div>
-          <span className="text-xs" style={{ fontFamily: "var(--font-caption)", color: "var(--color-text-secondary)" }}>
-            {data?.thisMonthMovies} movie{data?.thisMonthMovies !== 1 ? "s" : ""} this month
-          </span>
+          <p className="text-2xl font-bold" style={{ fontFamily: 'var(--font-data)', color: 'var(--color-success)' }}>
+            {s?.currentMonth}<span className="text-sm ml-1.5" style={{ color: 'var(--color-text-secondary)' }}>months</span>
+          </p>
+          <p className="text-xs mt-1" style={{ fontFamily: 'var(--font-caption)', color: 'var(--color-text-secondary)' }}>
+            {s?.currentMonth > 0
+              ? `Since ${fmtMonth(s?.currentMonthFrom)} · ${s?.thisMonthCount} this month`
+              : 'Nothing watched this month'}
+          </p>
         </div>
       </div>
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-5">
-        <StatCard
-          icon="Trophy"
-          iconColor="var(--color-primary)"
-          label="Longest Weekly"
-          value={`${data?.longestWeekStreak}w`}
-          sub="Best week streak"
-          bg="rgba(212,175,55,0.06)"
-          border="rgba(212,175,55,0.2)"
-        />
-        <StatCard
-          icon="Award"
-          iconColor="var(--color-success)"
-          label="Longest Monthly"
-          value={`${data?.longestMonthStreak}m`}
-          sub="Best month streak"
-          bg="rgba(78,205,196,0.06)"
-          border="rgba(78,205,196,0.2)"
-        />
-        <StatCard
-          icon="Zap"
-          iconColor="#F97316"
-          label="Most Active Week"
-          value={data?.mostActiveWeekCount}
-          sub={data?.mostActiveWeekLabel}
-          bg="rgba(249,115,22,0.06)"
-          border="rgba(249,115,22,0.2)"
-        />
-        <StatCard
-          icon="Star"
-          iconColor="#FF6B6B"
-          label="Most Active Month"
-          value={data?.mostActiveMonthCount}
-          sub={data?.mostActiveMonthLabel}
-          bg="rgba(255,107,107,0.06)"
-          border="rgba(255,107,107,0.2)"
-        />
-        <StatCard
-          icon="BarChart2"
-          iconColor="var(--color-primary)"
-          label="Avg / Active Week"
-          value={data?.avgPerWeek}
-          sub="movies per week"
-          bg="var(--color-surface-2)"
-          border="var(--color-border)"
-        />
-        <StatCard
-          icon="TrendingUp"
-          iconColor="var(--color-success)"
-          label="Avg / Active Month"
-          value={data?.avgPerMonth}
-          sub="movies per month"
-          bg="var(--color-surface-2)"
-          border="var(--color-border)"
-        />
-        <StatCard
-          icon="CalendarCheck"
-          iconColor="#9B59B6"
-          label="Active Weeks"
-          value={data?.activeWeeks}
-          sub="weeks with movies"
-          bg="rgba(155,89,182,0.06)"
-          border="rgba(155,89,182,0.2)"
-        />
-        <StatCard
-          icon="CalendarRange"
-          iconColor="#3498DB"
-          label="Active Months"
-          value={data?.activeMonths}
-          sub="months with movies"
-          bg="rgba(52,152,219,0.06)"
-          border="rgba(52,152,219,0.2)"
-        />
-      </div>
-      {/* Mini charts */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Last 8 weeks */}
-        <div className="rounded-lg p-3" style={{ background: "var(--color-surface-2)", border: "1px solid var(--color-border)" }}>
-          <div className="flex items-center gap-1.5 mb-3">
-            <Icon name="CalendarDays" size={13} color="var(--color-primary)" />
-            <span className="text-xs font-medium" style={{ fontFamily: "var(--font-caption)", color: "var(--color-text-primary)" }}>Last 8 Weeks</span>
-          </div>
-          <MiniBarChart data={data?.last8Weeks} color="var(--color-primary)" maxVal={0} />
-        </div>
 
-        {/* Last 6 months */}
-        <div className="rounded-lg p-3" style={{ background: "var(--color-surface-2)", border: "1px solid var(--color-border)" }}>
-          <div className="flex items-center gap-1.5 mb-3">
-            <Icon name="Calendar" size={13} color="var(--color-success)" />
-            <span className="text-xs font-medium" style={{ fontFamily: "var(--font-caption)", color: "var(--color-text-primary)" }}>Last 6 Months</span>
+      {/* records */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+        <Stat
+          icon="Trophy" iconColor="var(--color-primary)"
+          label="Longest Weekly" value={s?.longestWeek?.len} unit="w"
+          valueColor="var(--color-primary)"
+          sub={s?.longestWeek?.from ? `${fmtDay(s?.longestWeek?.from)} – ${fmtDay(s?.longestWeek?.to)}` : ''}
+        />
+        <Stat
+          icon="Award" iconColor="var(--color-success)"
+          label="Longest Monthly" value={s?.longestMonth?.len} unit="m"
+          valueColor="var(--color-success)"
+          sub={s?.longestMonth?.from !== null ? `${fmtMonth(s?.longestMonth?.from)} – ${fmtMonth(s?.longestMonth?.to)}` : ''}
+        />
+        <Stat
+          icon="Zap" iconColor="var(--color-accent)"
+          label="Most Active Week" value={s?.topWeek?.count}
+          valueColor="var(--color-accent)"
+          sub={s?.topWeek?.start ? `${fmtDay(s?.topWeek?.start)} – ${fmtDay(s?.topWeek?.start + 6 * DAY_MS)}` : ''}
+        />
+        <Stat
+          icon="Star" iconColor="var(--color-warning)"
+          label="Most Active Month" value={s?.topMonth?.count}
+          valueColor="var(--color-warning)"
+          sub={s?.topMonth?.idx !== null ? fmtMonth(s?.topMonth?.idx) : ''}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+        <Stat
+          icon="BarChart3" iconColor="var(--color-primary)"
+          label="Avg / Active Week" value={s?.avgPerWeek?.toFixed(1)}
+          valueColor="var(--color-text-primary)" sub="movies per week"
+        />
+        <Stat
+          icon="TrendingUp" iconColor="var(--color-success)"
+          label="Avg / Active Month" value={s?.avgPerMonth?.toFixed(1)}
+          valueColor="var(--color-text-primary)" sub="movies per month"
+        />
+        <Stat
+          icon="CalendarDays" iconColor="var(--color-secondary)"
+          label="Active Weeks" value={s?.activeWeeks}
+          valueColor="var(--color-secondary)"
+          sub={`since ${fmtDay(s?.firstDate)}`}
+        />
+        <Stat
+          icon="CalendarClock" iconColor="var(--color-success)"
+          label="Active Months" value={s?.activeMonths}
+          valueColor="var(--color-success)"
+          sub={`since ${fmtDay(s?.firstDate)}`}
+        />
+      </div>
+
+      {/* the gap */}
+      {s?.gap?.days > 0 && (
+        <div
+          className="rounded-lg p-3.5 mb-3"
+          style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs" style={{ fontFamily: 'var(--font-caption)', color: 'var(--color-text-secondary)' }}>
+              Longest gap between films
+            </span>
+            <Icon name="CalendarX" size={14} color="var(--color-text-secondary)" strokeWidth={1.8} />
           </div>
-          <MiniBarChart data={data?.last6Months} color="var(--color-success)" maxVal={0} />
+          <p className="text-xl font-bold leading-tight" style={{ fontFamily: 'var(--font-data)', color: 'var(--color-text-primary)' }}>
+            {s?.gap?.days}<span className="text-xs ml-1" style={{ color: 'var(--color-text-secondary)' }}>days</span>
+            {gapMonths >= 2 && (
+              <span className="text-xs ml-2" style={{ color: 'var(--color-text-secondary)', fontFamily: 'var(--font-caption)' }}>
+                (~{gapMonths} months)
+              </span>
+            )}
+          </p>
+          <p className="text-xs mt-1" style={{ fontFamily: 'var(--font-caption)', color: 'var(--color-text-secondary)' }}>
+            {fmtDay(s?.gap?.from)} → {fmtDay(s?.gap?.to)}
+          </p>
+        </div>
+      )}
+
+      {/* recent activity */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="rounded-lg p-3.5" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
+          <div className="flex items-center gap-1.5 mb-2.5">
+            <Icon name="Calendar" size={13} color="var(--color-primary)" strokeWidth={1.8} />
+            <span className="text-xs" style={{ fontFamily: 'var(--font-caption)', color: 'var(--color-text-secondary)' }}>Last 8 weeks</span>
+          </div>
+          <MiniBars data={lastWeeks} color="var(--color-primary)" />
+        </div>
+        <div className="rounded-lg p-3.5" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>
+          <div className="flex items-center gap-1.5 mb-2.5">
+            <Icon name="Calendar" size={13} color="var(--color-success)" strokeWidth={1.8} />
+            <span className="text-xs" style={{ fontFamily: 'var(--font-caption)', color: 'var(--color-text-secondary)' }}>Last 6 months</span>
+          </div>
+          <MiniBars data={lastMonths} color="var(--color-success)" />
         </div>
       </div>
     </div>
