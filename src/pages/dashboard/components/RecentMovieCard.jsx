@@ -30,7 +30,7 @@ const RecentMovieCard = ({ movie }) => {
         </p>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
-        {movie?.openingDay && <span className="text-xs px-1.5 py-0.5 rounded hidden sm:block" style={{ background:"rgba(255,107,107,0.15)",color:"var(--color-accent)",fontFamily:"var(--font-caption)" }}>DAY1</span>}
+        {movie?.openingDay && <span className="text-xs px-1.5 py-0.5 rounded hidden sm:block" style={{ background:"rgba(255,107,107,0.15)",color:"var(--color-accent)",fontFamily:"var(--font-caption)" }}>{movie?.openingShow ? "FDFS" : "Opening Day"}</span>}
         {movie?.is3D && <span className="text-xs px-1.5 py-0.5 rounded hidden sm:block" style={{ background:"rgba(212,175,55,0.12)",color:"var(--color-primary)",fontFamily:"var(--font-caption)" }}>3D</span>}
         <span className="text-sm font-semibold" style={{ fontFamily:"var(--font-data)",color:"var(--color-primary)" }}>{formatCurrency(movie?.totalCost)}</span>
       </div>
